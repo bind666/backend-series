@@ -24,16 +24,8 @@ const generateAccessAndRefereshTokens = async (userId) => {
     }
 }
 
-
 const registerUser = asyncHandler(async (req, res) => {
-    // res.status(200).json({
-    //     message: "ok sachin post request handle successfully"
-    // })
-
-
     const { fullName, email, username, password } = req.body
-    // console.log("email", email);
-
     if (
         [fullName, email, username, password].some((fields) => fields?.trim() === "")
     ) {
@@ -56,7 +48,6 @@ const registerUser = asyncHandler(async (req, res) => {
     if (req.files && Array.isArray(req.files.coverImage) && req.files.coverImage.length > 0) {
         coverImageLocalPath = req.files.coverImage[0].path
     }
-
 
     if (!avatarLocalPath) {
         throw new ApiError(400, "avatar file is required")
@@ -90,7 +81,6 @@ const registerUser = asyncHandler(async (req, res) => {
         new ApiResponse(200, createdUser, "user registered successfully")
     )
 })
-
 
 const loginUser = asyncHandler(async (req, res) => {
     // req body -> data
@@ -152,7 +142,6 @@ const loginUser = asyncHandler(async (req, res) => {
 
 })
 
-
 const logoutUser = asyncHandler(async (req, res) => {
     await User.findByIdAndUpdate(
         req.user._id,
@@ -177,7 +166,6 @@ const logoutUser = asyncHandler(async (req, res) => {
         .clearCookie("refreshToken", options)
         .json(new ApiResponse(200, {}, "User logged Out"))
 })
-
 
 const refreshAccessToken = asyncHandler(async (req, res) => {
     const incomingRefreshToken = req.cookies.refreshToken || req.body.refreshToken
@@ -227,5 +215,80 @@ const refreshAccessToken = asyncHandler(async (req, res) => {
 
 })
 
+const changeCurrentPassqord = asyncHandler(async (req, res) => {
+    const { oldPassword, newPassword } = req.body;
 
-export { registerUser, loginUser, logoutUser, refreshAccessToken }
+    const user = User.findById(req.user?._id)
+
+    const isPasswordCorrect = await isPasswordCorrect(oldPassword)
+
+    if (!isPasswordCorrect) {
+        throw new ApiError(400, "Invalid old password.")
+    }
+
+    user.password = newPassword;
+    await user.save({ validateBeforeSave: false });
+
+    return res.status(200).json(new ApiResponse(200, {}, "password changed successfully."))
+})
+
+const getCurrentUser = asyncHandler(async (req, res) => {
+    res.status(200).json(200, req.user, "Current user fetched successfully.")
+})
+
+const updateAccountDetail = asyncHandler(async (req, res) => {
+    const { fullName, email } = req.body;
+
+    if (!fullName || !email) {
+        throw new ApiError(400, "All fields required.")
+    }
+
+    const user = User.findByIdAndUpdate(req.user?._id, { $set: { fullName, email } }, { new: true })
+        .select("-password")
+
+    return res.status(200).json(200, user, "Account detail updated successfully.")
+
+})
+
+const updateUserAvatar = asyncHandler(async (req, res) => {
+    const avatarLocalPath = req.file?.path;
+
+    if (!avatarLocalPath) {
+        throw new ApiError(400, "Avatar file is missing.")
+    }
+
+    const avatar = await uploadOnCloudinary(avatarLocalPath)
+
+    if (!avatar.url) {
+        throw new ApiError(400, "Error while uploading avatar.")
+    }
+
+    const user = await User.findByIdAndUpdate(req.user?._id, { $set: { avatar: avatar.url } }, { new: true })
+        .select("-password")
+
+    return res.status(200).json(new ApiResponse(200, { user }, "Avatar updated successfully"))
+})
+
+const updateUserCoverImage = asyncHandler(async (req, res) => {
+    const coverImageLocalPath = req.file?.path;
+
+    if (!coverImageLocalPath) {
+        throw new ApiError(400, "Cover image file is missing.")
+    }
+
+    const coverImage = await uploadOnCloudinary(coverImageLocalPath)
+
+    if (!coverImage.url) {
+        throw new ApiError(400, "Error while uploading cover image.")
+    }
+
+    const user = await User.findByIdAndUpdate(req.user?._id, { $set: { coverImage: coverImage.url } }, { new: true })
+        .select("-password")
+
+    return res.status(200).json(new ApiResponse(200, { user }, "Cover image updated successfully"))
+})
+
+export {
+    registerUser, loginUser, logoutUser, refreshAccessToken, changeCurrentPassqord,
+    getCurrentUser, updateAccountDetail, updateUserAvatar, updateUserCoverImage
+}
