@@ -39,8 +39,6 @@ const registerUser = asyncHandler(async (req, res) => {
         throw new ApiError(409, "username or email already exist")
     }
 
-    // console.log(req.files);
-
     const avatarLocalPath = req.files?.avatar[0]?.path;
     // const coverImageLocalPath = req.files?.coverImage[0]?.path
 
@@ -91,17 +89,10 @@ const loginUser = asyncHandler(async (req, res) => {
     //send cookie
 
     const { email, username, password } = req.body
-    console.log(email);
 
     if (!username && !email) {
         throw new ApiError(400, "username or email is required")
     }
-
-    // Here is an alternative of above code based on logic discussed in video:
-    // if (!(username || email)) {
-    //     throw new ApiError(400, "username or email is required")
-
-    // }
 
     const user = await User.findOne({
         $or: [{ username }, { email }]
@@ -109,6 +100,10 @@ const loginUser = asyncHandler(async (req, res) => {
 
     if (!user) {
         throw new ApiError(404, "User does not exist")
+    }
+
+    if (!(user instanceof User)) {
+        throw new ApiError(500, "User instance is invalid");
     }
 
     const isPasswordValid = await user.isPasswordCorrect(password)
@@ -218,9 +213,9 @@ const refreshAccessToken = asyncHandler(async (req, res) => {
 const changeCurrentPassword = asyncHandler(async (req, res) => {
     const { oldPassword, newPassword } = req.body;
 
-    const user = User.findById(req.user?._id)
+    const user = await User.findById(req.user?._id)
 
-    const isPasswordCorrect = await isPasswordCorrect(oldPassword)
+    const isPasswordCorrect = await user.isPasswordCorrect(oldPassword)
 
     if (!isPasswordCorrect) {
         throw new ApiError(400, "Invalid old password.")
@@ -233,7 +228,7 @@ const changeCurrentPassword = asyncHandler(async (req, res) => {
 })
 
 const getCurrentUser = asyncHandler(async (req, res) => {
-    res.status(200).json(200, req.user, "Current user fetched successfully.")
+    return res.status(200).json(new ApiResponse(200, req.user, "Current user fetched successfully."))
 })
 
 const updateAccountDetail = asyncHandler(async (req, res) => {
@@ -243,10 +238,10 @@ const updateAccountDetail = asyncHandler(async (req, res) => {
         throw new ApiError(400, "All fields required.")
     }
 
-    const user = User.findByIdAndUpdate(req.user?._id, { $set: { fullName, email } }, { new: true })
+    const user = await User.findByIdAndUpdate(req.user?._id, { $set: { fullName, email: email } }, { new: true })
         .select("-password")
 
-    return res.status(200).json(200, user, "Account detail updated successfully.")
+    return res.status(200).json(new ApiResponse(200, { user }, "Account detail updated successfully."))
 
 })
 
